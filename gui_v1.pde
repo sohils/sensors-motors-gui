@@ -35,6 +35,9 @@ Textfield stepper_text;
 Textfield servo_text;
 
 Textlabel main_title; 
+Textlabel ir_units;
+Textlabel servo_unit;
+Textlabel _unit;
 Textarea log_title; 
 Textlabel stepper_title;
 Textlabel servo_title;
@@ -56,8 +59,7 @@ void lockUnlock(){
   
   // S3 & S4
   dc_angle_knob.lock();
-  //dc_rpm_knob.lock();
-  dc_rpm_slider.lock();
+  dc_rpm_knob.lock();
   
   if(manual_toggle.getValue() == 0){
     return;
@@ -79,19 +81,21 @@ void lockUnlock(){
       break;
     }
     case 3:{
-      dc_rpm_slider.unlock();
+      dc_rpm_knob.unlock();
       break;
     }
   }
 }
 
 void parseExecuteCommand(String commandString){
+  
   // Parse Command
   String commands[] = split(commandString,'_');
   int command;
   float value = 0;
   
   if(commands[0].length() != 1){
+    println(commands[0]);
     println("Command is not of length 1");
     return;
   }
@@ -112,7 +116,7 @@ void parseExecuteCommand(String commandString){
       break;
     }
     case 2: {
-      slot_toggle.setValue(int(value));
+      slot_toggle.setValue(int(value)==0);
       break;
     }
     case 3: {
@@ -128,7 +132,7 @@ void parseExecuteCommand(String commandString){
       break;
     }
     case 6: {
-      dc_rpm_knob.setValue(value);
+      dc_rpm_slider.setValue(value);
       updateGraph(0, dcAngleGraphValues, value);
       break;
     }
@@ -150,7 +154,7 @@ void setup() {
     if(portNames[i].contains("cu.usb"))
       portName = portNames[i];
   }
-  //portName = portNames[0];
+  portName = portNames[0];
   println(portName);  
   port = new Serial(this, portName, 9600);
   
@@ -201,9 +205,10 @@ void setup() {
       .setRange(0,100)
       .setColorCaptionLabel(color(20,20,20))
       .setFont(font)
-      .setNumberOfTickMarks(10)
       .setSliderMode(Slider.FLEXIBLE)
       .lock();
+  ir_units = cp5.addTextlabel("CM").setText("(CM)")
+        .setPosition(width/6 - 100, 355);
   
   cp5.getController("infraredRanger")
   .getCaptionLabel()
@@ -240,12 +245,14 @@ void setup() {
      .setMin(0)
      .setMax(360);
      
+  servo_unit = cp5.addTextlabel("servo_unit").setText("(degrees)")
+      .setPosition(width/2-20, 270);
+     
   servo_knob = cp5.addKnob("ServoAngle")
-      .setRange(0,360)
+      .setRange(0,180)
        .setValue(50)
        .setPosition(width/2-50 ,150)
        .setRadius(50)
-       .setNumberOfTickMarks(10)
        .setColorCaptionLabel(color(20,20,20))
        .setViewStyle(1)
        .setShowAngleRange(true)
@@ -254,14 +261,14 @@ void setup() {
     public void controlEvent(CallbackEvent theEvent) {
       println("m&"+theEvent.getController().getValue());
     }
-  }).addCallback( getValueFormatter() )
+  })
        .setFont(font);
    
   // DC Motor and Potentiometer
   dc_angle_knob = cp5.addKnob("DC_Motor_Angle")
       .setRange(0,360)
        .setValue(0)
-       .setPosition(9*width/12-40, 100)
+       .setPosition(9*width/12-40, 110)
        .setRadius(50)
        .setNumberOfTickMarks(10)
        .setColorCaptionLabel(color(20,20,20))
@@ -275,8 +282,9 @@ void setup() {
       .setSize(100, 20)
       .setRange(0,1024)
       .setColorCaptionLabel(color(20,20,20))
-      .setFont(font).addCallback( getValueFormatter() )
+      .setFont(font)
       .setNumberOfTickMarks(10)
+      .snapToTickMarks(false)
       .lock();
   cp5.getController("Current_DC_Angle")
   .getCaptionLabel()
@@ -286,7 +294,7 @@ void setup() {
   dc_rpm_knob = cp5.addKnob("DC_Motor_RPM")
       .setRange(-165,165)
        .setValue(0)
-       .setPosition(11*width/12-60, 100)
+       .setPosition(11*width/12-60, 110)
        .setRadius(50)
        .setNumberOfTickMarks(10)
        .setColorCaptionLabel(color(20,20,20))
@@ -301,14 +309,14 @@ void setup() {
       .setRange(-165,165)
       .setColorCaptionLabel(color(20,20,20))
       .setFont(font)
-      .setNumberOfTickMarks(10)
       .lock();
-  cp5.getController("DC_Motor_RPM")
+  
+  cp5.getController("Current_DC_RPM")
   .getCaptionLabel()
   .align(ControlP5.RIGHT, ControlP5.TOP_OUTSIDE)
   .setPaddingX(0);    
   
-  dc_mouth = cp5.addSlider("Original")
+  dc_mouth = cp5.addSlider("H#SH Original")
         .setPosition(5*width/6 - 100, 300)
         .setSize(200, 50)
         .setRange(0,100)
@@ -317,7 +325,7 @@ void setup() {
         .setSliderMode(Slider.FLEXIBLE)
         .setFont(font)
         .lock();
-  cp5.getController("Original")
+  cp5.getController("H#SH Original")
   .getCaptionLabel()
   .align(ControlP5.RIGHT, ControlP5.BOTTOM_OUTSIDE)
   .setPaddingX(0);
@@ -331,37 +339,25 @@ void setup() {
   } 
 }
 
-CallbackListener getValueFormatter() {
-  return new CallbackListener() {
-    public void controlEvent( final CallbackEvent theEvent ) {
-      switch( theEvent.getAction( ) )  {
-        case( ControlP5.ACTION_BROADCAST ):
-        Number n = theEvent.getController( ).getValue( );
-        if(theEvent.getController( ).getName() == "infraredRanger")
-          theEvent.getController( ).getValueLabel( ).setText( n +" Meters");
-        else if(theEvent.getController( ).getName() == "Current_DC_Angle")
-          theEvent.getController( ).getValueLabel( ).setText( n +" degrees");
-        break;
-      }
-    }
-  };
-}
-
 
 public void Set_Stepper_Angle(String value){
   value.trim();
-  boolean isNumber = value.matches("-?[0-9]+.?[0-9]*");
+  boolean isNumber = value.matches("-?[0-9]+[.]?[0-9]*");
   if(!isNumber){
     log_title.setText("The value entered is not a number.\n");
     return;
   }
-  port.write("1&"+value+"\n");
-  log_title.setText("Input value is "+value+"\n");
+  if(-360<=float(value) && float(value)<=360){
+    port.write("1&"+value+"\n");
+    log_title.setText("Input value is "+value+"\n");
+  }
+  else
+    log_title.setText("The number entered is not within range.\n");
 }
 
 public void Set_Servo_Angle(String value){
   value.trim();
-  boolean isNumber = value.matches("-?[0-9]+.?[0-9]*");
+  boolean isNumber = value.matches("-?[0-9]+[.]?[0-9]*");
   if(!isNumber){
     log_title.setText("The text entered is not a number.\n");
     return;
@@ -396,6 +392,7 @@ void updateGraph(int i, float[][] lineGraphValues, float value){
 }
 
 void draw() {
+  //lockUnlock();
   String cmd;
   if(gotCommand){
     cmd = command;
@@ -410,7 +407,10 @@ void draw() {
   line(width/3,0,width/3,400);
   line(width/3,400,2*width/3,400);
   line(2*width/3,0,2*width/3,400);
-
+  
+  highlightColor = (manual_toggle.getValue() == 0)?60:80;
+    
+  
   fill(0,baseColor + ((sensor_state%4==0)?highlightColor:0));stroke(0);strokeWeight(0);
   rect(width/6-125,150,250,225);
   fill(0,baseColor + ((sensor_state%4==1)?highlightColor:0));stroke(0);strokeWeight(0);
@@ -455,6 +455,10 @@ void serialEvent(Serial port) {
     println(read);
   }
   if(read != null){
+    if(read.charAt(0)=='0'){
+      parseExecuteCommand(read);
+      return;
+    }
     //println(read);
     command = read;
     gotCommand = true;
