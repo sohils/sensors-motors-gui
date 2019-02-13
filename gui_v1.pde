@@ -37,7 +37,6 @@ Textfield servo_text;
 Textlabel main_title; 
 Textlabel ir_units;
 Textlabel servo_unit;
-Textlabel _unit;
 Textarea log_title; 
 Textlabel stepper_title;
 Textlabel servo_title;
@@ -207,7 +206,7 @@ void setup() {
       .setFont(font)
       .setSliderMode(Slider.FLEXIBLE)
       .lock();
-  ir_units = cp5.addTextlabel("CM").setText("(CM)")
+  ir_units = cp5.addTextlabel("cm").setText("(CM)")
         .setPosition(width/6 - 100, 355);
   
   cp5.getController("infraredRanger")
@@ -246,7 +245,7 @@ void setup() {
      .setMax(360);
      
   servo_unit = cp5.addTextlabel("servo_unit").setText("(degrees)")
-      .setPosition(width/2-20, 270);
+      .setPosition(width/2-23, 270);
      
   servo_knob = cp5.addKnob("ServoAngle")
       .setRange(0,180)
